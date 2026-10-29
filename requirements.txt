@@ -1,0 +1,8 @@
+yfpy
+fastapi
+uvicorn[standard]
+pydantic-settings
+httpx
+itsdangerous
+cryptography
+redis

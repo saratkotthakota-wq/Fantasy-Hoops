@@ -1,0 +1,45 @@
+# Render Blueprint: creates the Python backend and its Redis-compatible Key Value store.
+# The frontend is deployed separately on Vercel (see frontend/README.md).
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ---- Redis-compatible store: response cache + users' encrypted Yahoo tokens ----
+  - type: keyvalue
+    name: fantasy-hoops-kv
+    region: oregon          # keep identical to the web service; internal URLs only work in-region
+    plan: free              # free instances may not persist data across restarts (users re-login)
+    maxmemoryPolicy: noeviction   # never evict keys: tokens live here
+    ipAllowList: []         # no public access; only your Render services can connect
+
+  # ---- Python backend (FastAPI), built from ./Dockerfile ----
+  - type: web
+    name: fantasy-hoops-api
+    runtime: docker
+    region: oregon
+    plan: free              # sleeps after 15 min idle; first request afterwards takes ~1 min
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: fantasy-hoops-kv
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: /
+      - key: COOKIE_SECURE
+        value: "true"
+      # Values you enter in the Render dashboard on first deploy (never committed to git):
+      - key: YAHOO_CONSUMER_KEY
+        sync: false
+      - key: YAHOO_CONSUMER_SECRET
+        sync: false
+      - key: YAHOO_REDIRECT_URI     # https://<your-vercel-domain>/api/auth/callback
+        sync: false
+      - key: ENCRYPTION_KEY         # from: python -m scripts.gen_keys (must be a Fernet key)
+        sync: false
